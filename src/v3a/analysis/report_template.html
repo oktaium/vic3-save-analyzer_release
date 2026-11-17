@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vic3 Economy Report</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10); --accent: #2a78d6; --wash: rgba(42,120,214,0.08);
+  --good: #006300; --bad: #d03b3b;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10); --accent: #3987e5; --wash: rgba(57,135,229,0.14);
+    --good: #0ca30c; --bad: #e66767;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10); --accent: #3987e5; --wash: rgba(57,135,229,0.14);
+  --good: #0ca30c; --bad: #e66767;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 20px 16px 8px; max-width: 1240px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
+h2 { font-size: 17px; margin: 0 0 4px; font-weight: 620; }
+h3 { font-size: 14px; margin: 18px 0 6px; font-weight: 600; }
+.sub { color: var(--ink2); font-size: 13px; }
+nav { position: sticky; top: 0; z-index: 5; background: var(--page); border-bottom: 1px solid var(--grid); }
+nav .in { max-width: 1240px; margin: 0 auto; padding: 0 16px; display: flex; gap: 2px; overflow-x: auto; align-items: center; }
+nav button { border: 0; background: none; color: var(--ink2); padding: 10px 12px; font: inherit; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+nav button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+nav .sp { flex: 1; }
+main { max-width: 1240px; margin: 0 auto; padding: 16px; }
+section { display: none; } section.on { display: block; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tile { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 16px; }
+.tile .k { color: var(--ink2); font-size: 12.5px; }
+.tile .v { font-size: 26px; font-weight: 600; margin: 2px 0; }
+.tile .d { font-size: 12.5px; color: var(--ink2); }
+.up { color: var(--good); } .down { color: var(--bad); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 8px 0 12px; }
+.controls label { color: var(--ink2); font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+select, input[type=search] { font: inherit; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; padding: 4px 8px; max-width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.chip { border: 1px solid var(--axis); background: var(--surface); color: var(--ink2); border-radius: 999px; padding: 2px 10px 2px 8px; font: inherit; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.chip .sw { width: 10px; height: 10px; border-radius: 3px; background: transparent; border: 1px solid var(--axis); }
+.chip.on { color: var(--ink); border-color: var(--ink2); }
+.chip.on .sw { border-color: transparent; }
+.chip.gp { font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink2); margin: 6px 0 0; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .lbl { fill: var(--ink2); font-size: 11.5px; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--ring); box-shadow: 0 4px 16px rgba(0,0,0,.12); border-radius: 8px; padding: 8px 10px; font-size: 12px; min-width: 150px; display: none; z-index: 3; }
+.tip .t { font-weight: 600; margin-bottom: 4px; color: var(--ink); }
+.tip .r { display: flex; gap: 8px; align-items: center; justify-content: space-between; color: var(--ink2); }
+.tip .r b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tip i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+.tablewrap { overflow-x: auto; max-height: 520px; overflow-y: auto; border: 1px solid var(--ring); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { padding: 5px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child, th.l, td.l { text-align: left; }
+th { position: sticky; top: 0; background: var(--surface); color: var(--ink2); font-weight: 600; cursor: pointer; user-select: none; }
+th.sorted::after { content: " \2193"; } th.sorted.asc::after { content: " \2191"; }
+tr:hover td { background: var(--wash); }
+td.click { cursor: pointer; }
+.bar { display: inline-block; height: 8px; border-radius: 0 4px 4px 0; background: var(--s1); vertical-align: middle; margin-left: 6px; }
+.note { color: var(--ink2); font-size: 12.5px; margin: 6px 0 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+code { font-size: 12px; background: var(--wash); padding: 1px 4px; border-radius: 4px; }
+.empty { color: var(--muted); padding: 30px 0; text-align: center; }
+#themebtn { font-size: 12.5px; }
+.viewsel { color: var(--ink2); font-size: 13px; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; padding: 0 8px; }
+.cmpkey { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 12.5px; color: var(--ink2); margin-top: 6px; }
+.cmpkey svg { vertical-align: middle; margin-right: 6px; }
+.bv { color: var(--muted); font-size: 11.5px; }
+.lab { color: var(--ink2); font-size: 13px; min-width: 64px; }
+.controls .chips { margin: 0; }
+#pm-charts h3 { margin: 4px 0 2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Victoria 3 economy report</h1>
+  <div class="sub" id="meta"></div>
+</header>
+<nav><div class="in" id="tabs">
+  <button data-t="overview" class="on">Overview</button>
+  <button data-t="countries">Countries</button>
+  <button data-t="sectors">Sectors</button>
+  <button data-t="types">Building types</button>
+  <button data-t="econ">Building economics</button>
+  <button data-t="pm">Production methods</button>
+  <button data-t="about">About the data</button>
+  <span class="sp"></span>
+  <button id="themebtn" title="Switch light/dark">Theme</button>
+</div></nav>
+<main>
+
+<section id="overview" class="on">
+  <div class="tiles" id="tiles"></div>
+  <div class="grid2">
+    <div class="card"><h2>World GDP</h2><div class="sub">Sum of all countries, GBP</div><div class="chart" id="c-world"></div></div>
+    <div class="card"><h2>Great-power share of world GDP</h2><div class="sub">Countries that are great powers in that save</div><div class="chart" id="c-gpshare"></div></div>
+  </div>
+  <div class="card"><h2>Largest economies</h2><div class="sub">By GDP in the last save; click a row to open it in Countries</div>
+    <div class="tablewrap" id="t-top"></div></div>
+</section>
+
+<section id="countries">
+  <div class="card">
+    <h2 id="c-title">Countries over time</h2>
+    <div class="controls">
+      <label>Metric <select id="cm"></select></label>
+      <label><input type="checkbox" id="cidx"> Index (first save = 100)</label>
+      <label><input type="checkbox" id="clog"> Log scale</label>
+      <label>Add country <select id="cadd"></select></label>
+      <button class="chip" id="cclear">Clear</button>
+      <button class="chip" id="cgps">Great powers</button>
+    </div>
+    <div class="chips" id="cchips"></div>
+    <div class="chart" id="c-countries"></div>
+    <p class="note">Up to 8 countries at once; each keeps its colour while selected. Bold chips are great powers in at least one save.</p>
+  </div>
+  <div class="card"><h2>Growth, first to last save</h2><div class="sub" id="g-sub"></div>
+    <div class="tablewrap" id="t-growth"></div></div>
+</section>
+
+<section id="sectors">
+  <div class="card">
+    <h2>Economic structure by sector</h2>
+    <div class="controls">
+      <label>Country <select id="sc"></select></label>
+      <label>Measure <select id="sm"><option value="employed">Workers</option><option value="levels">Building levels</option><option value="value_added">Value added (GBP/week)</option></select></label>
+      <label><input type="checkbox" id="sshare"> Show as share (100%)</label>
+      <label><input type="checkbox" id="snosub"> Hide subsistence</label>
+    </div>
+    <div class="controls" id="s-cmpctl" style="display:none">
+      <label>Compare A and B <select id="smode"><option value="pair">Side by side: A | B (same scale)</option><option value="one">One sector: A vs B</option><option value="lines">All sectors as lines</option></select></label>
+      <label id="s1wrap">Sector <select id="s1"></select></label>
+    </div>
+    <div class="chart" id="c-sector"></div>
+    <div class="grid2" id="s-pair" style="display:none"><div><h3 id="s-ha"></h3><div class="chart" id="c-sector-a"></div></div><div><h3 id="s-hb"></h3><div class="chart" id="c-sector-b"></div></div></div>
+    <div class="legend" id="l-sector"></div>
+  </div>
+  <div class="card"><h2>Sector change</h2><div class="sub" id="s-sub"></div><div class="tablewrap" id="t-sector"></div></div>
+</section>
+
+<section id="types">
+  <div class="card">
+    <h2 id="ty-title">Building type</h2>
+    <div class="controls">
+      <label>Country <select id="tyc"></select></label>
+      <label>Building type <select id="ty"></select></label>
+      <label><input type="checkbox" id="tyshare"> Share of world levels</label>
+    </div>
+    <div class="chart" id="c-type"></div>
+    <div class="legend" id="l-type"></div>
+    <p class="note" id="ty-note"></p>
+  </div>
+  <div class="card"><h2>Building-type growth, first to last save</h2>
+    <div class="controls"><label>Country <select id="tgc"></select></label><label>Sector <select id="tgs"></select></label></div>
+    <div class="tablewrap" id="t-tgrowth"></div></div>
+</section>
+
+<section id="econ">
+  <div class="card">
+    <h2>Building economics in the last save</h2>
+    <div class="sub">Great powers (in any save), per building type. Value added = revenue − input cost; wages derived = value added − balance.</div>
+    <div class="controls">
+      <label>Country <select id="ec"></select></label>
+      <label>Sector <select id="es"></select></label>
+      <label>Bar shows <select id="eb"><option value="value_added_per_worker_year">Value added per worker per year</option><option value="value_added_week">Value added per week</option><option value="balance_week">Profit (balance) per week</option><option value="margin">Margin</option><option value="employed">Workers</option></select></label>
+    </div>
+    <div class="chart" id="c-econ"></div>
+    <div class="legend" id="l-econ"></div>
+  </div>
+  <div class="card"><h2>Table</h2><div class="tablewrap" id="t-econ"></div></div>
+</section>
+
+<section id="pm">
+  <div class="card">
+    <h2 id="pm-title">Production-method adoption</h2>
+    <div class="sub">A building type has up to six production-method groups, A to F in the game's order (e.g. Base, Automation, Ownership).
+      Inside a group every building runs exactly one method, so a group's shares add up to 100 %. Share of the type's levels, last save of every year.</div>
+    <div class="controls">
+      <label>Building type <select id="pt"></select></label>
+      <label id="prunw" style="display:none">Runs <select id="prun"><option value="both">A and B</option><option value="a">A only</option><option value="b">B only</option></select></label>
+    </div>
+    <div class="controls"><span class="lab">Group</span><div class="chips" id="pgroups"></div></div>
+    <div class="controls"><span class="lab">Countries (up to 6)</span><div class="chips" id="pcs"></div></div>
+    <div class="grid2" id="pm-charts"></div>
+    <div class="legend" id="l-pm"></div>
+    <p class="note" id="pm-note"></p>
+  </div>
+  <div class="card"><h2 id="pmb-title">Across countries</h2><div class="sub" id="pmb-sub"></div><div class="chart" id="c-pmbar"></div></div>
+  <div class="card"><h2>Methods of this group</h2><div class="sub">Share in the last year, per country<span id="pmt-runs"></span>.</div><div class="tablewrap" id="t-pm"></div></div>
+</section>
+
+<section id="about">
+  <div class="card" id="aboutbox"></div>
+</section>
+</main>
+<div class="tip" id="tip"></div>
+
+<script>
+const RAW = /*__DATA__*/null;
+// ------------------------------------------------------------------ helpers
+const $ = id => document.getElementById(id);
+function store(k, v) { try { localStorage.setItem('v3a.' + k, JSON.stringify(v)); } catch (e) {} }
+function load(k, d) { try { const v = localStorage.getItem('v3a.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
+// comparison report (run_comparison.py): RAW.cmp holds run B; View = A, B, or A vs B (B dashed / light)
+const CMP = RAW.cmp || null;
+const VIEW = CMP ? (['a', 'b', 'cmp'].includes(load('view', 'cmp')) ? load('view', 'cmp') : 'cmp') : 'a';
+const D = VIEW === 'b' ? CMP.B : RAW;
+const B = VIEW === 'cmp' ? CMP.B : null;       // run drawn next to D, or null
+const LA = CMP ? CMP.labels[0] : '', LB = CMP ? CMP.labels[1] : '';
+const bOf = (...path) => {   // B's value at this path, e.g. bOf('countries', 'GBR', 's', 'gdp'); null if absent
+ let o = B; for (const k of path) { if (o == null) return null; o = o[k]; } return o ?? null; };
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const SLOTS = [1,2,3,4,5,6,7,8].map(i => 'var(--s' + i + ')');
+const N = D.dates.length;
+const UNIT = Object.fromEntries(D.metrics.map(m => [m[0], m[2]]));
+const LABEL = Object.fromEntries(D.metrics.map(m => [m[0], m[1]]));
+const tlabel = t => (D.types[t] || {}).label || t.replace(/^building_/, '');
+function fmt(v, unit) {
+  if (v == null || isNaN(v)) return '–';
+  const a = Math.abs(v); let s;
+  if (a >= 1e9) s = (v / 1e9).toFixed(a >= 1e10 ? 1 : 2) + 'B';
+  else if (a >= 1e6) s = (v / 1e6).toFixed(a >= 1e7 ? 1 : 2) + 'M';
+  else if (a >= 1e4) s = (v / 1e3).toFixed(a >= 1e5 ? 0 : 1) + 'k';
+  else if (a >= 100) s = v.toFixed(0);
+  else if (a >= 1) s = v.toFixed(a >= 10 ? 1 : 2);
+  else s = v.toPrecision(2);
+  if (unit && unit.startsWith('GBP')) s = (v < 0 ? '−£' + s.slice(1) : '£' + s);
+  return s;
+}
+const pct = (v, d = 1) => v == null || isNaN(v) ? '–' : (v > 0 ? '+' : '') + (v * 100).toFixed(d) + '%';
+const pct0 = (v, d = 1) => v == null || isNaN(v) ? '–' : (v * 100).toFixed(d) + '%';
+const yearOf = d => d.slice(0, 4);
+function opt(sel, items, val) { sel.innerHTML = items.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); if (val != null) sel.value = val; }
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+
+function niceTicks(lo, hi, n = 5) {
+  if (lo === hi) { hi = lo + 1; }
+  const span = hi - lo, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= n) || 10 * mag;
+  const t = []; for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) t.push(+v.toPrecision(12));
+  return { ticks: t, lo: Math.min(lo, t[0]), hi: Math.max(hi, t[t.length - 1]) };
+}
+function logTicks(lo, hi) {
+  const t = []; for (let e = Math.floor(Math.log10(lo)); e <= Math.ceil(Math.log10(hi)); e++) for (const m of [1, 2, 5]) { const v = m * Math.pow(10, e); if (v >= lo / 1.0001 && v <= hi * 1.0001) t.push(v); }
+  return t.length >= 2 ? t : [lo, hi];
+}
+
+// ------------------------------------------------------------------ tooltip
+const tip = $('tip');
+function showTip(host, x, y, html) {
+  tip.innerHTML = html; tip.style.display = 'block';
+  const r = host.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  let left = r.left + window.scrollX + x + 14; if (left + tw > window.scrollX + document.documentElement.clientWidth - 8) left = r.left + window.scrollX + x - tw - 14;
+  let top = r.top + window.scrollY + y - th / 2; top = Math.max(window.scrollY + 8, top);
+  tip.style.left = left + 'px'; tip.style.top = top + 'px';
+}
+const hideTip = () => tip.style.display = 'none';
+
+// ------------------------------------------------------------------ line / stacked area chart
+// opts: {x:[labels], series:[{name,color,values,dash}], unit, log, stacked, percent, share (lines on a fixed 0-1 axis),
+//        ymax (stacked: at least this top), height, xfmt}
+function timeChart(host, o) {
+  host.innerHTML = ''; host.onmousemove = host.onmouseleave = null;
+  const W = Math.max(300, host.clientWidth), H = o.height || 340, m = { l: 58, r: o.endLabels ? 70 : 14, t: 10, b: 26 };
+  const n = o.x.length, iw = W - m.l - m.r, ih = H - m.t - m.b;
+  if (!o.series.length) { host.innerHTML = '<div class="empty">Nothing selected</div>'; return; }
+  let stacks = null;
+  if (o.stacked) {
+    stacks = o.series.map(() => new Array(n));
+    for (let i = 0; i < n; i++) {
+      let tot = 0; o.series.forEach(s => tot += Math.max(0, s.values[i] || 0));
+      let acc = 0; o.series.forEach((s, k) => { let v = Math.max(0, s.values[i] || 0); if (o.percent) v = tot ? v / tot : 0; stacks[k][i] = [acc, acc + v]; acc += v; });
+    }
+  }
+  let lo = Infinity, hi = -Infinity;
+  if (stacks) { lo = 0; stacks.forEach(st => st.forEach(p => hi = Math.max(hi, p[1]))); if (o.ymax != null && !o.percent) hi = Math.max(hi, o.ymax); }
+  else o.series.forEach(s => s.values.forEach(v => { if (v != null && (!o.log || v > 0)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }));
+  if (!isFinite(lo)) { host.innerHTML = '<div class="empty">No data</div>'; return; }
+  let ticks, y;
+  if (o.log) { ticks = logTicks(lo, hi); const a = Math.log10(Math.min(lo, ticks[0])), b = Math.log10(Math.max(hi, ticks[ticks.length - 1])); y = v => m.t + ih - (Math.log10(v) - a) / (b - a || 1) * ih; }
+  else { if (!o.stacked && lo > 0 && lo < hi * 0.5) lo = 0; if (o.percent || o.share) { lo = 0; hi = 1; } const nt = niceTicks(lo, hi); ticks = nt.ticks; const a = nt.lo, b = nt.hi; y = v => m.t + ih - (v - a) / (b - a || 1) * ih; }
+  const x = i => m.l + (n === 1 ? iw / 2 : i / (n - 1) * iw);
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img', 'aria-label': o.aria || 'chart' }, host);
+  ticks.forEach(t => { el('line', { x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t), stroke: css('--grid'), 'stroke-width': 1 }, svg); el('text', { x: m.l - 8, y: y(t) + 4, 'text-anchor': 'end' }, svg).textContent = o.percent ? Math.round(t * 100) + '%' : (o.yfmt ? o.yfmt(t) : fmt(t, o.unit)); });
+  el('line', { x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih, stroke: css('--axis') }, svg);
+  // x ticks: years
+  let lastX = -1e9; const years = o.x.map(d => d.slice(0, 4));
+  const step = Math.max(1, Math.ceil(years.length / (iw / 52)));
+  let cnt = 0;
+  for (let i = 0; i < n; i++) { if (i === 0 || years[i] !== years[i - 1]) { if (cnt++ % Math.max(1, Math.round(step / Math.max(1, n / new Set(years).size))) !== 0) continue; const px = x(i); if (px - lastX < 34) continue; lastX = px; el('text', { x: px, y: H - 8, 'text-anchor': 'middle' }, svg).textContent = years[i]; } }
+  const g = el('g', {}, svg);
+  if (stacks) {
+    o.series.forEach((s, k) => {
+      let d = ''; for (let i = 0; i < n; i++) d += (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(stacks[k][i][1]).toFixed(1);
+      for (let i = n - 1; i >= 0; i--) d += 'L' + x(i).toFixed(1) + ',' + y(stacks[k][i][0]).toFixed(1);
+      el('path', { d: d + 'Z', fill: s.color, stroke: css('--surface'), 'stroke-width': 1, 'stroke-linejoin': 'round' }, g);
+    });
+  } else {
+    o.series.forEach(s => {
+      let d = '', pen = false;
+      s.values.forEach((v, i) => { if (v == null || (o.log && v <= 0)) { pen = false; return; } d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(v).toFixed(1); pen = true; });
+      el('path', Object.assign({ d, fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, s.dash ? { 'stroke-dasharray': '5 4', 'stroke-width': 1.8 } : {}), g);
+    });
+    const solid = o.series.filter(s => !s.dash);
+    if (o.endLabels && solid.length <= 8) {
+      const ends = solid.map(s => { let i = n - 1; while (i >= 0 && (s.values[i] == null || (o.log && s.values[i] <= 0))) i--; return i < 0 ? null : { s, y: y(s.values[i]), x: x(i) }; }).filter(Boolean).sort((a, b) => a.y - b.y);
+      for (let k = 1; k < ends.length; k++) if (ends[k].y - ends[k - 1].y < 13) ends[k].y = ends[k - 1].y + 13;
+      ends.forEach(e => { el('circle', { cx: e.x, cy: y(e.s.values[n - 1] ?? e.s.values.filter(v => v != null).pop()), r: 3, fill: e.s.color, stroke: css('--surface'), 'stroke-width': 2 }, g); el('text', { x: m.l + iw + 8, y: e.y + 4, class: 'lbl' }, svg).textContent = e.s.name; });
+    }
+  }
+  const cross = el('line', { y1: m.t, y2: m.t + ih, stroke: css('--axis'), 'stroke-width': 1, visibility: 'hidden' }, svg);
+  const dots = el('g', {}, svg);
+  host.onmousemove = ev => {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width;
+    if (px < m.l - 10 || px > m.l + iw + 10) { cross.setAttribute('visibility', 'hidden'); dots.innerHTML = ''; hideTip(); return; }
+    const i = Math.max(0, Math.min(n - 1, Math.round((px - m.l) / iw * (n - 1))));
+    cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('visibility', 'visible');
+    dots.innerHTML = '';
+    let rows = o.series.map((s, k) => ({ s, k, v: s.values[i], top: stacks ? stacks[k][i][1] : s.values[i], share: stacks ? stacks[k][i][1] - stacks[k][i][0] : null }));
+    rows.forEach(rw => { if (rw.top != null && !(o.log && rw.top <= 0)) el('circle', { cx: x(i), cy: y(rw.top), r: 4, fill: rw.s.color, stroke: css('--surface'), 'stroke-width': 2 }, dots); });
+    rows = rows.filter(rw => rw.v != null);
+    if (!stacks) rows.sort((a, b) => b.v - a.v); else rows.reverse();
+    const tot = stacks && !o.percent ? rows.reduce((a, r) => a + (r.v || 0), 0) : null;
+    let h = `<div class="t">${o.x[i]}</div>` + rows.map(rw => `<div class="r"><span><i style="background:${rw.s.color}"></i>${rw.s.name}</span><b>${o.percent ? pct0(rw.share) : (o.vfmt ? o.vfmt(rw.v) : fmt(rw.v, o.unit))}${stacks && !o.percent && tot ? ' <span style="color:var(--muted);font-weight:400">' + pct0(rw.v / tot, 0) + '</span>' : ''}</b></div>`).join('');
+    if (tot != null) h += `<div class="r" style="margin-top:4px;border-top:1px solid var(--grid);padding-top:4px"><span>Total</span><b>${fmt(tot, o.unit)}</b></div>`;
+    const cr = host.getBoundingClientRect();
+    showTip(host, (ev.clientX - cr.left), (ev.clientY - cr.top), h);
+  };
+  host.onmouseleave = () => { cross.setAttribute('visibility', 'hidden'); dots.innerHTML = ''; hideTip(); };
+}
+
+// ------------------------------------------------------------------ horizontal bar chart
+function barChart(host, rows, o) {   // rows: [{label, value, color, sub, value2}]; value2 (run B) = light bar below
+  host.innerHTML = '';
+  if (!rows.length) { host.innerHTML = '<div class="empty">No buildings with data</div>'; return; }
+  const pair = rows.some(r => 'value2' in r);
+  const W = Math.max(300, host.clientWidth), rh = pair ? 30 : 22, m = { l: Math.min(220, W * 0.38), r: 70, t: 4, b: 6 }, H = m.t + m.b + rows.length * rh;
+  const iw = W - m.l - m.r;
+  const vals = rows.map(r => r.value).concat(rows.map(r => r.value2).filter(v => v != null));
+  const lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+  const x = v => m.l + (v - lo) / ((hi - lo) || 1) * iw;
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H }, host);
+  el('line', { x1: x(0), x2: x(0), y1: m.t, y2: H - m.b, stroke: css('--axis') }, svg);
+  rows.forEach((r, i) => {
+    const yy = m.t + i * rh;
+    if (pair) {   // A bar (solid) over B bar (light)
+      [[r.value, 3, 1], [r.value2, 16, 0.4]].forEach(([v, dy, op]) => {
+        if (v == null) { el('text', { x: x(0) + 6, y: yy + dy + 9 }, svg).textContent = '– (B)'; return; }
+        const a0 = x(Math.min(0, v)), a1 = x(Math.max(0, v));
+        el('rect', { x: a0, y: yy + dy, width: Math.max(1, a1 - a0), height: 10, rx: 2, fill: r.color, 'fill-opacity': op }, svg);
+        el('text', { x: v < 0 ? a0 - 6 : a1 + 6, y: yy + dy + 9, 'text-anchor': v < 0 ? 'end' : 'start' }, svg).textContent = o.fmt(v);
+      });
+      const t = el('text', { x: m.l - 8, y: yy + 18, 'text-anchor': 'end', class: 'lbl' }, svg); t.textContent = r.label.length > 30 ? r.label.slice(0, 29) + '…' : r.label;
+      const hit = el('rect', { x: 0, y: yy, width: W, height: rh, fill: 'transparent' }, svg);
+      hit.addEventListener('mousemove', ev => { const cr = host.getBoundingClientRect(); showTip(host, ev.clientX - cr.left, ev.clientY - cr.top, `<div class="t">${r.label}</div>` + (r.sub || '')); });
+      hit.addEventListener('mouseleave', hideTip);
+      return;
+    }
+    const x0 = x(Math.min(0, r.value)), x1 = x(Math.max(0, r.value)), w = Math.max(1, x1 - x0);
+    const neg = r.value < 0;
+    const path = neg ? `M${x1},${yy + 5}H${x0 + 4}a4,4 0 0 0 -4,4v4a4,4 0 0 0 4,4H${x1}Z` : `M${x0},${yy + 5}H${x1 - 4}a4,4 0 0 1 4,4v4a4,4 0 0 1 -4,4H${x0}Z`;
+    el('path', { d: w > 8 ? path : `M${x0},${yy + 5}h${w}v12h${-w}Z`, fill: r.color }, svg);
+    const t = el('text', { x: m.l - 8, y: yy + 15, 'text-anchor': 'end', class: 'lbl' }, svg); t.textContent = r.label.length > 30 ? r.label.slice(0, 29) + '…' : r.label;
+    el('text', { x: (neg ? x0 - 6 : x1 + 6), y: yy + 15, 'text-anchor': neg ? 'end' : 'start' }, svg).textContent = o.fmt(r.value);
+    const hit = el('rect', { x: 0, y: yy, width: W, height: rh, fill: 'transparent' }, svg);
+    hit.addEventListener('mousemove', ev => { const cr = host.getBoundingClientRect(); showTip(host, ev.clientX - cr.left, ev.clientY - cr.top, `<div class="t">${r.label}</div>` + (r.sub || '')); });
+    hit.addEventListener('mouseleave', hideTip);
+  });
+}
+
+// ------------------------------------------------------------------ sortable table
+function table(host, cols, rows, o = {}) {  // cols: [{k,l,f,left,bar}]
+  const st = host._sort || { k: o.sort || cols[1].k, desc: o.desc !== false };
+  host._sort = st;
+  const draw = () => {
+    const c = cols.find(c => c.k === st.k) || cols[0];
+    const sorted = rows.slice().sort((a, b) => { const va = a[st.k], vb = b[st.k]; if (va == null) return 1; if (vb == null) return -1; return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * (st.desc ? -1 : 1); });
+    const maxb = {}; cols.filter(c => c.bar).forEach(c => maxb[c.k] = Math.max(...rows.map(r => Math.abs(r[c.k] || 0))) || 1);
+    host.innerHTML = '<table><thead><tr>' + cols.map(c => `<th data-k="${c.k}" class="${c.left ? 'l' : ''} ${c.k === st.k ? 'sorted' + (st.desc ? '' : ' asc') : ''}">${c.l}</th>`).join('') + '</tr></thead><tbody>' +
+      sorted.map((r, i) => '<tr data-i="' + rows.indexOf(r) + '">' + cols.map(c => { const v = r[c.k]; let s = c.f ? c.f(v, r) : (v ?? '–'); if (c.bar && v != null) s += `<span class="bar" style="width:${Math.round(Math.abs(v) / maxb[c.k] * 60)}px;${v < 0 ? 'background:var(--s8)' : ''}"></span>`; return `<td class="${c.left ? 'l' : ''}${o.onclick ? ' click' : ''}">${s}</td>`; }).join('') + '</tr>').join('') + '</tbody></table>';
+    host.querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.k; if (st.k === k) st.desc = !st.desc; else { st.k = k; st.desc = !(cols.find(c => c.k === k).left); } draw(); });
+    if (o.onclick) host.querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => o.onclick(rows[+tr.dataset.i]));
+  };
+  draw();
+}
+const sign = v => v == null ? '' : v > 0 ? 'up' : v < 0 ? 'down' : '';
+const pctCell = v => `<span class="${sign(v)}">${pct(v)}</span>`;
+
+// ------------------------------------------------------------------ meta / tabs / theme
+const M = D.meta;
+$('meta').innerHTML = `${M.saves} monthly saves, in-game ${M.first_date} → ${M.last_date} · game ${M.game_version} · source <code>${M.source_run}</code> · report run <code>${M.run_id}</code>`;
+const dashKey = (c, d) => `<svg width="26" height="8"><line x1="1" y1="4" x2="25" y2="4" stroke="${c}" stroke-width="2" ${d ? 'stroke-dasharray="5 4"' : ''}/></svg>`;
+if (CMP) {
+  document.title = 'Vic3 run comparison';
+  document.querySelector('h1').textContent = 'Victoria 3 run comparison';
+  const R = CMP.runs, mod = r => r.modded ? ' <b>(modded' + (r.modded_note ? ': ' + r.modded_note.replace(/^MODDED RUN:\s*/, '').split(/[,(]/)[0].trim() : '') + ')</b>' : ' (vanilla)';
+  $('meta').innerHTML = `<b>A</b> = ${LA}${mod(R[0])} · <b>B</b> = ${LB}${mod(R[1])}<br>${M.saves} shared saves, in-game ${M.first_date} → ${M.last_date} · game ${M.game_version} · report run <code>${M.run_id}</code>`
+    + (VIEW === 'cmp' ? `<div class="cmpkey"><span>${dashKey('var(--ink2)', false)}A: ${LA}</span><span>${dashKey('var(--ink2)', true)}B: ${LB} (dashed lines, light bars)</span></div>`
+       : `<div class="cmpkey"><span>Showing only <b>${VIEW === 'a' ? 'A: ' + LA : 'B: ' + LB}</b>. Switch View to compare.</span></div>`);
+  const vs = document.createElement('label'); vs.className = 'viewsel';
+  vs.innerHTML = `View <select id="view"><option value="cmp">A vs B</option><option value="a">A: ${LA}</option><option value="b">B: ${LB}</option></select>`;
+  $('themebtn').before(vs); $('view').value = VIEW;
+  $('view').onchange = () => { store('view', $('view').value); location.reload(); };
+}
+let tab = load('tab', 'overview');
+const draws = {};
+function setTab(t) { if (!$(t)) t = 'overview'; tab = t; store('tab', t); document.querySelectorAll('nav button[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t)); document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === t)); hideTip(); (draws[t] || (() => {}))(); }
+document.querySelectorAll('nav button[data-t]').forEach(b => b.onclick = () => setTab(b.dataset.t));
+$('themebtn').onclick = () => { const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); const nx = cur === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = nx; store('theme', nx); setTab(tab); };
+{ const th = load('theme', null); if (th) document.documentElement.dataset.theme = th; }
+let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(() => setTab(tab), 150); });
+
+// ------------------------------------------------------------------ overview
+const W0 = D.world;
+const last = a => { for (let i = a.length - 1; i >= 0; i--) if (a[i] != null) return a[i]; return null; };
+const first = a => a.find(v => v != null);
+function tile(k, v, d) { return `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`; }
+function chg(a, b) { const g = a ? b / a - 1 : null; return `<span class="${sign(g)}">${pct(g)}</span> since ${yearOf(D.dates[0])}`; }
+const C = D.countries, tags = Object.keys(C);
+const leader = tags.slice().sort((a, b) => (last(C[b].s.gdp) || 0) - (last(C[a].s.gdp) || 0))[0];
+const WB = B ? B.world : null;
+const vsB = (a, b, unit) => b == null ? '' : `<br>B: ${fmt(b, unit)} <span class="${sign(a ? b / a - 1 : null)}">(${pct(a ? b / a - 1 : null)} vs A)</span>`;
+const bLeader = B ? Object.keys(B.countries).sort((a, b) => (last(B.countries[b].s.gdp) || 0) - (last(B.countries[a].s.gdp) || 0))[0] : null;
+$('tiles').innerHTML = tile('World GDP, ' + D.dates[N - 1], fmt(last(W0.gdp), 'GBP'), chg(first(W0.gdp), last(W0.gdp)) + (WB ? vsB(last(W0.gdp), last(WB.gdp), 'GBP') : ''))
+  + tile('World population', fmt(last(W0.population)), chg(first(W0.population), last(W0.population)) + (WB ? vsB(last(W0.population), last(WB.population)) : ''))
+  + tile('World building levels', fmt(last(W0.building_levels)), chg(first(W0.building_levels), last(W0.building_levels)) + (WB ? vsB(last(W0.building_levels), last(WB.building_levels)) : ''))
+  + tile('Largest economy', leader, fmt(last(C[leader].s.gdp), 'GBP') + ' GDP · ' + pct0(last(C[leader].s.gdp) / last(W0.gdp)) + ' of world'
+         + (bLeader ? `<br>B: ${bLeader}, ${fmt(last(B.countries[bLeader].s.gdp), 'GBP')}` : ''));
+draws.overview = () => {
+  const wl = (name, k) => [{ name: name + (B ? ' · A' : ''), color: SLOTS[0], values: W0[k] }].concat(WB ? [{ name: name + ' · B', color: SLOTS[1], values: WB[k], dash: true }] : []);
+  timeChart($('c-world'), { x: D.dates, unit: 'GBP', series: wl('World GDP', 'gdp'), height: 260, aria: 'World GDP over time' });
+  timeChart($('c-gpshare'), { x: D.dates, series: wl('GP share', 'gp_gdp_share'), height: 260, vfmt: v => pct0(v), yfmt: v => pct0(v, 0), unit: '', aria: 'Great power share of world GDP' });
+  const G = Object.fromEntries(D.growth.filter(g => g[1] === 'gdp').map(g => [g[0], g]));
+  const rows = tags.map(t => { const gb = bOf('countries', t, 's', 'gdp'); return { tag: t, gp: C[t].gp ? 'yes' : '', gdp: last(C[t].s.gdp), pop: last(C[t].s.population), pc: last(C[t].s.gdp_per_capita), share: last(C[t].s.gdp) / last(W0.gdp), g: G[t] ? G[t][4] : null, cagr: G[t] ? G[t][5] : null, lv: last(C[t].s.building_levels), gdpb: gb ? last(gb) : null, dgdp: gb && last(C[t].s.gdp) ? last(gb) / last(C[t].s.gdp) - 1 : null }; }).sort((a, b) => b.gdp - a.gdp).slice(0, 15);
+  const cols = [{ k: 'tag', l: 'Country', left: true }, { k: 'gdp', l: B ? 'GDP (A)' : 'GDP', f: v => fmt(v, 'GBP'), bar: true }]
+    .concat(B ? [{ k: 'gdpb', l: 'GDP (B)', f: v => fmt(v, 'GBP') }, { k: 'dgdp', l: 'B vs A', f: pctCell }] : [])
+    .concat([{ k: 'share', l: 'World share', f: v => pct0(v) }, { k: 'g', l: 'GDP growth', f: pctCell }, { k: 'cagr', l: 'per year', f: pctCell }, { k: 'pop', l: 'Population', f: v => fmt(v) }, { k: 'pc', l: 'GDP/capita', f: v => fmt(v, 'GBP') }, { k: 'lv', l: 'Building levels', f: v => fmt(v) }, { k: 'gp', l: 'Great power', left: true }]);
+  table($('t-top'), cols, rows, { sort: 'gdp', onclick: r => { if (!sel.includes(r.tag)) addCountry(r.tag); setTab('countries'); } });
+};
+
+// ------------------------------------------------------------------ countries
+const colorOf = {};
+const MAIN = M.mode === 'country' ? (M.focus_countries || []) :   // countries shown by default (A vs B: GPs of either run)
+  Array.from(new Set(M.great_powers.concat(B ? B.meta.great_powers : []))).filter(t => C[t]);
+let sel = load('sel', MAIN.slice(0, 8)).filter(t => C[t]);
+function assignColors() { const used = new Set(sel.map(t => colorOf[t]).filter(c => c != null)); sel.forEach(t => { if (colorOf[t] == null || ![...used].includes(colorOf[t])) { const free = [0,1,2,3,4,5,6,7].find(k => !sel.some(o => o !== t && colorOf[o] === k)); colorOf[t] = free; } }); Object.keys(colorOf).forEach(t => { if (!sel.includes(t)) delete colorOf[t]; }); }
+function addCountry(t) { if (sel.includes(t)) return; if (sel.length >= 8) sel.shift(); sel.push(t); assignColors(); store('sel', sel); }
+opt($('cm'), D.metrics.map(m => [m[0], m[1]]), load('cm', 'gdp'));
+$('cidx').checked = load('cidx', false); $('clog').checked = load('clog', false);
+const byGdp = tags.slice().sort((a, b) => (last(C[b].s.gdp) || 0) - (last(C[a].s.gdp) || 0));
+opt($('cadd'), [['', '— choose —']].concat(byGdp.map(t => [t, t + (C[t].gp ? ' (GP)' : '')])));
+$('cadd').onchange = e => { if (e.target.value) { addCountry(e.target.value); e.target.value = ''; draws.countries(); } };
+$('cclear').onclick = () => { sel = []; assignColors(); store('sel', sel); draws.countries(); };
+$('cgps').onclick = () => { sel = MAIN.slice(0, 8); for (const k in colorOf) delete colorOf[k]; assignColors(); store('sel', sel); draws.countries(); };
+['cm', 'cidx', 'clog'].forEach(id => $(id).onchange = () => { store(id, $(id).type === 'checkbox' ? $(id).checked : $(id).value); draws.countries(); });
+assignColors();
+draws.countries = () => {
+  const m = $('cm').value, idx = $('cidx').checked, lg = $('clog').checked;
+  const chipTags = Array.from(new Set(MAIN.concat(sel)));
+  $('cchips').innerHTML = chipTags.map(t => `<button class="chip ${sel.includes(t) ? 'on' : ''} ${C[t].gp ? 'gp' : ''}" data-t="${t}"><span class="sw" style="${sel.includes(t) ? 'background:' + SLOTS[colorOf[t]] : ''}"></span>${t}</button>`).join('');
+  $('cchips').querySelectorAll('.chip').forEach(b => b.onclick = () => { const t = b.dataset.t; if (sel.includes(t)) sel = sel.filter(x => x !== t); else addCountry(t); assignColors(); store('sel', sel); draws.countries(); });
+  const ix = v => { if (!idx || !v) return v; const b = first(v); return v.map(x => x == null || !b ? null : x / b * 100); };
+  const series = [];
+  sel.forEach(t => { series.push({ name: t + (B ? ' · A' : ''), color: SLOTS[colorOf[t]], values: ix(C[t].s[m]) }); const vb = bOf('countries', t, 's', m); if (vb) series.push({ name: t + ' · B', color: SLOTS[colorOf[t]], values: ix(vb), dash: true }); });
+  $('c-title').textContent = LABEL[m] + (idx ? ' (index, first save = 100)' : '') + ' over time';
+  timeChart($('c-countries'), { x: D.dates, series, unit: idx ? '' : UNIT[m], log: lg, endLabels: true, height: 380, aria: LABEL[m] + ' by country' });
+  const G = D.growth.filter(g => g[1] === m);
+  const GB = B ? Object.fromEntries(B.growth.filter(g => g[1] === m).map(g => [g[0], g])) : {};
+  $('g-sub').textContent = LABEL[m] + ' (' + UNIT[m] + ') for the ' + G.length + ' countries in this report. Click a row to add it to the chart.' + (B ? ' B columns: same country in run B.' : '');
+  table($('t-growth'), [{ k: 'tag', l: 'Country', left: true }, { k: 'first', l: 'First save', f: v => fmt(v, UNIT[m]) }, { k: 'last', l: B ? 'Last save (A)' : 'Last save', f: v => fmt(v, UNIT[m]), bar: true }]
+    .concat(B ? [{ k: 'lastb', l: 'Last save (B)', f: v => fmt(v, UNIT[m]) }, { k: 'd', l: 'B vs A', f: pctCell }] : [])
+    .concat([{ k: 'g', l: B ? 'Growth (A)' : 'Growth', f: pctCell }]).concat(B ? [{ k: 'gb', l: 'Growth (B)', f: pctCell }] : [])
+    .concat([{ k: 'cagr', l: B ? 'CAGR (A)' : 'Per year (CAGR)', f: pctCell }]).concat(B ? [{ k: 'cagrb', l: 'CAGR (B)', f: pctCell }] : [])
+    .concat([{ k: 'gp', l: 'Great power', left: true }]),
+    G.map(g => { const h = GB[g[0]]; return { tag: g[0], first: g[2], last: g[3], g: g[4], cagr: g[5], gp: C[g[0]] && C[g[0]].gp ? 'yes' : '', lastb: h ? h[3] : null, gb: h ? h[4] : null, cagrb: h ? h[5] : null, d: h && g[3] && h[3] != null ? h[3] / g[3] - 1 : null }; }), { sort: 'last', onclick: r => { addCountry(r.tag); draws.countries(); } });
+};
+
+// ------------------------------------------------------------------ sectors
+const S = D.sectors;
+opt($('sc'), [['WORLD', 'World']].concat(byGdp.filter(t => D.sector[t]).map(t => [t, t + (C[t].gp ? ' (GP)' : '')])), load('sc', 'WORLD'));
+$('sm').value = load('sm', 'employed'); $('sshare').checked = load('sshare', false); $('snosub').checked = load('snosub', false);
+opt($('s1'), S.map(s => [s, s]), load('s1', 'Manufacturing'));
+$('smode').value = load('smode', 'pair');
+if (B) $('s-cmpctl').style.display = '';
+['sc', 'sm', 'sshare', 'snosub', 'smode', 's1'].forEach(id => $(id).onchange = () => { store(id, $(id).type === 'checkbox' ? $(id).checked : $(id).value); draws.sectors(); });
+draws.sectors = () => {
+  const t = $('sc').value, m = $('sm').value, d = D.sector[t];
+  if (!d) { $('c-sector').innerHTML = '<div class="empty">No data</div>'; return; }
+  const unit = m === 'value_added' ? 'GBP/week' : '', share = $('sshare').checked;
+  const series = S.map((s, k) => ({ name: s, color: SLOTS[k], values: d[m][k] })).filter((s, k) => !($('snosub').checked && S[k] === 'Subsistence'));
+  const db = bOf('sector', t);
+  const mode = B ? $('smode').value : 'single';
+  $('s1wrap').style.display = mode === 'one' ? '' : 'none';
+  $('s-pair').style.display = mode === 'pair' ? '' : 'none';
+  $('c-sector').style.display = mode === 'pair' ? 'none' : '';
+  const nameOf = c => c === 'WORLD' ? 'World' : c;
+  if (B) {   // A vs B, for the chosen country (or the world)
+    const sb = db ? S.map((s, k) => ({ name: s, color: SLOTS[k], values: db[m][k] })).filter((s, k) => !($('snosub').checked && S[k] === 'Subsistence')) : [];
+    const shr = ss => { if (!share) return ss; const tot = D.dates.map((_, i) => ss.reduce((a, s) => a + Math.max(0, s.values[i] || 0), 0)); return ss.map(s => Object.assign({}, s, { values: s.values.map((v, i) => tot[i] ? (v || 0) / tot[i] : null) })); };
+    const pf = { unit: share ? '' : unit, share, vfmt: share ? (v => pct0(v)) : null, yfmt: share ? (v => pct0(v, 0)) : null };
+    if (mode === 'pair') {   // two stacked charts, same y scale
+      const tot = ss => D.dates.map((_, i) => ss.reduce((a, s) => a + Math.max(0, s.values[i] || 0), 0));
+      const ymax = share ? null : Math.max(...tot(series), ...tot(sb));
+      $('s-ha').textContent = nameOf(t) + ' · A: ' + LA; $('s-hb').textContent = nameOf(t) + ' · B: ' + LB;
+      timeChart($('c-sector-a'), { x: D.dates, series, stacked: true, percent: share, unit, ymax, height: 320, aria: 'Sector structure, A' });
+      if (sb.length) timeChart($('c-sector-b'), { x: D.dates, series: sb, stacked: true, percent: share, unit, ymax, height: 320, aria: 'Sector structure, B' });
+      else $('c-sector-b').innerHTML = '<div class="empty">No sector data for this country in B</div>';
+    } else {
+      const keep = mode === 'one' ? (s => s.name === $('s1').value) : (() => true);
+      const lines = shr(series).filter(keep).map(s => Object.assign({}, s, { name: s.name + ' · A' })).concat(shr(sb).filter(keep).map(s => Object.assign({}, s, { name: s.name + ' · B', dash: true })));
+      timeChart($('c-sector'), Object.assign({ x: D.dates, series: lines, height: 380, aria: 'Sector structure, A vs B' }, pf));
+      if (!db) $('c-sector').insertAdjacentHTML('beforeend', '<p class="note">No sector data for this country in B.</p>');
+    }
+  } else timeChart($('c-sector'), { x: D.dates, series, stacked: true, percent: share, unit, height: 380, aria: 'Sector structure' });
+  $('l-sector').innerHTML = series.slice().reverse().filter(s => mode !== 'one' || s.name === $('s1').value).map(s => `<span><i style="background:${s.color}"></i>${s.name}</span>`).join('') + (B && mode !== 'pair' ? `<span>${dashKey('var(--ink2)', false)}A</span><span>${dashKey('var(--ink2)', true)}B</span>` : '');
+  const tot0 = series.reduce((a, s) => a + (s.values[0] || 0), 0), tot1 = series.reduce((a, s) => a + (s.values[N - 1] || 0), 0);
+  $('s-sub').textContent = (t === 'WORLD' ? 'World' : t) + ', ' + $('sm').selectedOptions[0].text.toLowerCase() + ', ' + D.dates[0] + ' vs ' + D.dates[N - 1];
+  if (B) {
+    const sv = k => db ? db[m][k][N - 1] || 0 : null;
+    const totb = db ? S.reduce((a, s, k) => a + (($('snosub').checked && s === 'Subsistence') ? 0 : sv(k)), 0) : null;
+    table($('t-sector'), [{ k: 'name', l: 'Sector', left: true }, { k: 'b', l: 'A, ' + D.dates[N - 1], f: v => fmt(v, unit), bar: true }, { k: 'bb', l: 'B, ' + D.dates[N - 1], f: v => fmt(v, unit) }, { k: 'd', l: 'B vs A', f: pctCell }, { k: 'sb', l: 'Share A', f: v => pct0(v) }, { k: 'sbb', l: 'Share B', f: v => pct0(v) }, { k: 'ds', l: 'Share B − A (pts)', f: v => `<span class="${sign(v)}">${v == null ? '–' : (v > 0 ? '+' : '') + (v * 100).toFixed(1)}</span>` }],
+      series.map(s => { const k = S.indexOf(s.name), b = s.values[N - 1] || 0, bb = sv(k); return { name: s.name, b, bb, d: b && bb != null ? bb / b - 1 : null, sb: tot1 ? b / tot1 : null, sbb: totb ? bb / totb : null, ds: tot1 && totb ? bb / totb - b / tot1 : null }; }), { sort: 'b' });
+    return;
+  }
+  table($('t-sector'), [{ k: 'name', l: 'Sector', left: true }, { k: 'a', l: D.dates[0], f: v => fmt(v, unit) }, { k: 'b', l: D.dates[N - 1], f: v => fmt(v, unit), bar: true }, { k: 'g', l: 'Growth', f: pctCell }, { k: 'sa', l: 'Share then', f: v => pct0(v) }, { k: 'sb', l: 'Share now', f: v => pct0(v) }, { k: 'ds', l: 'Share change (pts)', f: v => `<span class="${sign(v)}">${v == null ? '–' : (v > 0 ? '+' : '') + (v * 100).toFixed(1)}</span>` }],
+    series.map(s => { const a = s.values[0] || 0, b = s.values[N - 1] || 0; return { name: s.name, a, b, g: a ? b / a - 1 : null, sa: tot0 ? a / tot0 : null, sb: tot1 ? b / tot1 : null, ds: tot0 && tot1 ? b / tot1 - a / tot0 : null }; }), { sort: 'b' });
+};
+
+// ------------------------------------------------------------------ building types
+const TL = D.type_levels, GPS = MAIN;
+// building types listed by category (Development as one group; Agriculture, Extraction, Urban with the game's groups,
+// e.g. Mines), groups and types inside them by levels, largest first (categories: economy.list_group)
+const CAT_ORDER = D.list_categories || ['development', 'agriculture', 'extraction', 'urban', 'other'];
+const CAT_LABEL = { development: 'Development', agriculture: 'Agriculture', extraction: 'Extraction', urban: 'Urban', other: 'Other' };
+const catOf = t => { const c = (D.types[t] || {}).category; return CAT_ORDER.includes(c) ? c : 'other'; };
+const grpName = (c, g) => g === CAT_LABEL[c] ? g : CAT_LABEL[c] + ' · ' + g;   // 'Development', 'Extraction · Mines'
+const grpOf = t => grpName(catOf(t), (D.types[t] || {}).group_label || 'Other');
+function typeOptions(sel, types, lv, unit, val) {   // fill a <select> with <optgroup>s per category · group
+  const by = {};
+  types.forEach(t => { const c = catOf(t), g = (D.types[t] || {}).group_label || 'Other'; by[c] = by[c] || {}; (by[c][g] = by[c][g] || []).push(t); });
+  let h = '';
+  CAT_ORDER.filter(c => by[c]).forEach(c => Object.entries(by[c])
+    .map(([g, ts]) => [g, ts.sort((a, b) => lv(b) - lv(a)), ts.reduce((s, t) => s + lv(t), 0)]).sort((a, b) => b[2] - a[2])
+    .forEach(([g, ts]) => { h += `<optgroup label="${grpName(c, g)}">` + ts.map(t => `<option value="${t}">${tlabel(t)} · ${fmt(lv(t))} ${unit}</option>`).join('') + '</optgroup>'; }));
+  sel.innerHTML = h;
+  if (val && types.includes(val)) sel.value = val; else if (sel.options.length) sel.value = sel.options[0].value;
+}
+const typeList = Object.keys(TL.WORLD);
+// Country: '' = all great powers (types by world levels), or one focus country (only its building types, by its levels)
+const tyCountries = Array.from(new Set(Object.keys(TL).concat(B ? Object.keys(B.type_levels) : []))).filter(t => t !== 'WORLD')
+  .sort((a, b) => (C[b] ? last(C[b].s.gdp) || 0 : 0) - (C[a] ? last(C[a].s.gdp) || 0 : 0));
+opt($('tyc'), [['', 'Great powers (all)']].concat(tyCountries.map(t => [t, t + (C[t] && C[t].gp ? ' (GP)' : '')])), load('tyc', ''));
+if ($('tyc').value == null || !$('tyc').options[$('tyc').selectedIndex]) $('tyc').value = '';
+function fillTY() {   // building-type list for the chosen country (types it has had in any save, A or B)
+  const c = $('tyc').value, prev = load('ty', 'building_textile_mill');
+  if (!c) { typeOptions($('ty'), typeList, t => last(TL.WORLD[t]) || 0, 'world levels', prev); return; }
+  const ta = TL[c] || {}, tb = bOf('type_levels', c) || {};
+  const types = Array.from(new Set(Object.keys(ta).concat(Object.keys(tb)))).filter(t => (ta[t] || []).some(v => v > 0) || (tb[t] || []).some(v => v > 0));
+  typeOptions($('ty'), types, t => (ta[t] ? last(ta[t]) : 0) || 0, 'levels' + (B ? ' (A)' : ''), prev);
+}
+fillTY();
+$('tyshare').checked = load('tyshare', false);
+['ty', 'tyshare'].forEach(id => $(id).onchange = () => { store(id, $(id).type === 'checkbox' ? $(id).checked : $(id).value); draws.types(); });
+$('tyc').onchange = () => {
+  const c = $('tyc').value; store('tyc', c); fillTY();
+  const tg = c || 'WORLD'; if ([...$('tgc').options].some(o => o.value === tg)) { $('tgc').value = tg; store('tgc', tg); }   // growth table follows
+  draws.types();
+};
+const gpColor = Object.fromEntries(GPS.map((t, i) => [t, SLOTS[i % 8]]));
+draws.types = () => {
+  const bt = $('ty').value, sh = $('tyshare').checked, w = TL.WORLD[bt] || [], one = $('tyc').value;
+  const wb = bOf('type_levels', 'WORLD', bt) || [];
+  const conv = (arr, ww) => arr.map((v, i) => sh ? (ww[i] ? (v || 0) / ww[i] : null) : v);
+  const series = [];
+  (one ? [one] : GPS).forEach(t => {
+    const a = TL[t] && TL[t][bt], b = bOf('type_levels', t, bt), col = one ? SLOTS[0] : gpColor[t];
+    if (a) series.push({ name: t + (B ? ' · A' : ''), color: col, values: conv(a, w) });
+    if (b) series.push({ name: t + ' · B', color: col, values: conv(b, wb), dash: true });
+  });
+  $('ty-title').textContent = tlabel(bt) + (one ? ' in ' + one + (sh ? ': share of world levels' : ': levels') : (sh ? ': great-power share of world levels' : ': levels by great power')) + (B ? ' (A solid, B dashed)' : '');
+  timeChart($('c-type'), { x: D.dates, series, unit: '', vfmt: sh ? (v => pct0(v)) : null, yfmt: sh ? (v => pct0(v, 0)) : null, endLabels: true, height: 360, aria: 'Building levels by country' });
+  $('l-type').innerHTML = Array.from(new Set(series.map(s => s.name.split(' · ')[0]))).map(t => `<span><i style="background:${one ? SLOTS[0] : gpColor[t]}"></i>${t}</span>`).join('');
+  const sec = (D.types[bt] || {}).sector;
+  let cnote = '';
+  if (one) {
+    const a = (TL[one] || {})[bt] || [], b = bOf('type_levels', one, bt) || [];
+    cnote = `${one}${B ? ' (A)' : ''}: ${fmt(first(a) || 0)} → ${fmt(last(a) || 0)} levels, ${pct0(last(w) ? (last(a) || 0) / last(w) : null)} of world.` + (B ? ` ${one} (B): ${fmt(first(b) || 0)} → ${fmt(last(b) || 0)} levels, ${pct0(last(wb) ? (last(b) || 0) / last(wb) : null)} of world.` : '') + ' ';
+  }
+  $('ty-note').textContent = cnote + `World${B ? ' (A)' : ''}: ${fmt(first(w))} → ${fmt(last(w))} levels (${pct(first(w) ? last(w) / first(w) - 1 : null)}).` + (B ? ` World (B): ${fmt(first(wb))} → ${fmt(last(wb))} levels (${pct(first(wb) ? last(wb) / first(wb) - 1 : null)}).` : '') + ` Group: ${grpOf(bt)}. Sector: ${sec}.` + (one ? '' : ' Great powers without this building are not shown.');
+};
+opt($('tgc'), [['WORLD', 'World']].concat(tyCountries.map(t => [t, t + (C[t] && C[t].gp ? ' (GP)' : '')])), load('tgc', 'WORLD'));
+if ($('tgc').selectedIndex < 0) $('tgc').value = 'WORLD';
+opt($('tgs'), [['', 'All sectors']].concat(S.map(s => [s, s])), load('tgs', ''));
+['tgc', 'tgs'].forEach(id => $(id).onchange = () => { store(id, $(id).value); drawTG(); });
+function drawTG() {
+  const c = $('tgc').value, s = $('tgs').value;
+  const lvCell = v => `<span class="${sign(v)}">${v > 0 ? '+' : ''}${fmt(v)}</span>`;
+  const TB = B ? Object.fromEntries(B.type_growth.filter(r => r[0] === c).map(r => [r[1], r])) : {};
+  const rows = D.type_growth.filter(r => r[0] === c && (!s || (D.types[r[1]] || {}).sector === s)).map(r => ({ bt: r[1], name: tlabel(r[1]), grp: grpOf(r[1]), sector: (D.types[r[1]] || {}).sector, a: r[2], b: r[3], ch: r[4], g: r[5], emp: r[6] }));
+  if (B) {   // add B's last levels; types only B has are listed too
+    const seen = new Set(rows.map(r => r.bt));
+    Object.values(TB).filter(r => !seen.has(r[1]) && (!s || (D.types[r[1]] || {}).sector === s)).forEach(r => rows.push({ bt: r[1], name: tlabel(r[1]), grp: grpOf(r[1]), sector: (D.types[r[1]] || {}).sector, a: null, b: 0, ch: null, g: null, emp: null }));
+    rows.forEach(r => { const h = TB[r.bt]; r.bb = h ? h[3] : 0; r.chb = h ? h[4] : null; r.d = r.bb - (r.b || 0); });
+  }
+  table($('t-tgrowth'), [{ k: 'name', l: 'Building type', left: true }, { k: 'grp', l: 'Group', left: true }, { k: 'sector', l: 'Sector', left: true }, { k: 'a', l: D.dates[0], f: v => fmt(v) }, { k: 'b', l: (B ? 'A, ' : '') + D.dates[N - 1], f: v => fmt(v) }]
+    .concat(B ? [{ k: 'bb', l: 'B, ' + D.dates[N - 1], f: v => fmt(v) }, { k: 'd', l: 'B − A (levels)', f: lvCell, bar: true }] : [])
+    .concat([{ k: 'ch', l: B ? 'Change A' : 'Change (levels)', f: lvCell, bar: !B }]).concat(B ? [{ k: 'chb', l: 'Change B', f: lvCell }] : [])
+    .concat([{ k: 'g', l: B ? 'Growth A' : 'Growth', f: pctCell }, { k: 'emp', l: B ? 'Workers now (A)' : 'Workers now', f: v => fmt(v) }]),
+    rows, { sort: B ? 'd' : 'ch', onclick: r => { $('ty').value = r.bt; store('ty', r.bt); draws.types(); $('types').scrollIntoView({ behavior: 'smooth' }); } });
+}
+const _dt = draws.types; draws.types = () => { _dt(); drawTG(); };
+
+// ------------------------------------------------------------------ economics
+const EC = D.econ_cols, ER = D.econ.map(r => Object.fromEntries(EC.map((c, i) => [c, r[i]])));
+opt($('ec'), [['', 'All great powers']].concat(GPS.map(t => [t, t])), load('ec', GPS.includes('GBR') ? 'GBR' : ''));
+opt($('es'), [['', 'All sectors']].concat(S.filter(s => s !== 'Subsistence').map(s => [s, s]).concat([['Subsistence', 'Subsistence']])), load('es', ''));
+$('eb').value = load('eb', 'value_added_per_worker_year');
+['ec', 'es', 'eb'].forEach(id => $(id).onchange = () => { store(id, $(id).value); draws.econ(); });
+const EUNIT = { value_added_per_worker_year: 'GBP', value_added_week: 'GBP', balance_week: 'GBP', employed: '', margin: '%' };
+const ERB = B ? B.econ.map(r => Object.fromEntries(B.econ_cols.map((c, i) => [c, r[i]]))) : null;
+draws.econ = () => {
+  const c = $('ec').value, s = $('es').value, b = $('eb').value;
+  const rows = econRows(ER, c, s);
+  const rb = ERB ? Object.fromEntries(econRows(ERB, c, s).map(r => [r.building_type, r])) : null;
+  if (rb) rows.forEach(r => { const h = rb[r.building_type] || {}; r.levels_b = h.levels ?? null; r.employed_b = h.employed ?? null; r.vapw_b = h.value_added_per_worker_year ?? null; r.balance_b = h.balance_week ?? null; r.cmp_b = h[b] ?? null; });
+  const unitFmt = b === 'margin' ? (v => pct0(v, 0)) : (v => fmt(v, EUNIT[b]));
+  const top = rows.filter(r => r[b] != null && (b !== 'employed' || r[b] > 0)).sort((x, y) => y[b] - x[b]).slice(0, 25);
+  const secIdx = Object.fromEntries(S.map((x, i) => [x, i]));
+  const bsub = r => rb ? `<div class="r" style="margin-top:4px;border-top:1px solid var(--grid);padding-top:4px"><span>B: levels</span><b>${fmt(r.levels_b)}</b></div><div class="r"><span>B: workers</span><b>${fmt(r.employed_b)}</b></div><div class="r"><span>B: value added / worker / yr</span><b>${fmt(r.vapw_b, 'GBP')}</b></div><div class="r"><span>B: profit / week</span><b>${fmt(r.balance_b, 'GBP')}</b></div>` : '';
+  barChart($('c-econ'), top.map(r => Object.assign({ label: tlabel(r.building_type), value: r[b], color: SLOTS[secIdx[r.sector] ?? 0], sub: `<div class="r"><span>Sector</span><b>${r.sector}</b></div><div class="r"><span>Levels</span><b>${fmt(r.levels)}</b></div><div class="r"><span>Workers</span><b>${fmt(r.employed)}</b></div><div class="r"><span>Value added / worker / yr</span><b>${fmt(r.value_added_per_worker_year, 'GBP')}</b></div><div class="r"><span>Wage / worker / yr</span><b>${fmt(r.wage_per_worker_year, 'GBP')}</b></div><div class="r"><span>Profit / week</span><b>${fmt(r.balance_week, 'GBP')}</b></div><div class="r"><span>Margin</span><b>${pct0(r.margin, 0)}</b></div>` + bsub(r) }, rb ? { value2: r.cmp_b } : {})), { fmt: unitFmt });
+  $('l-econ').innerHTML = S.filter(x => top.some(r => r.sector === x)).map(x => `<span><i style="background:${SLOTS[secIdx[x]]}"></i>${x}</span>`).join('') + (rb ? '<span>Upper bar = A, light bar = B (same building type)</span>' : '');
+  table($('t-econ'), [{ k: 'name', l: 'Building type', left: true }, { k: 'country_tag', l: 'Country', left: true }, { k: 'sector', l: 'Sector', left: true }, { k: 'levels', l: 'Levels', f: v => fmt(v) }]
+    .concat(rb ? [{ k: 'levels_b', l: 'Levels (B)', f: v => fmt(v) }] : [])
+    .concat([{ k: 'occupancy', l: 'Staffed', f: v => pct0(v, 0) }, { k: 'employed', l: 'Workers', f: v => fmt(v) }]).concat(rb ? [{ k: 'employed_b', l: 'Workers (B)', f: v => fmt(v) }] : [])
+    .concat([{ k: 'revenue_week', l: 'Revenue /wk', f: v => fmt(v, 'GBP') }, { k: 'value_added_week', l: 'Value added /wk', f: v => fmt(v, 'GBP'), bar: true }, { k: 'value_added_per_worker_year', l: 'VA / worker / yr', f: v => fmt(v, 'GBP') }]).concat(rb ? [{ k: 'vapw_b', l: 'VA / worker / yr (B)', f: v => fmt(v, 'GBP') }] : [])
+    .concat([{ k: 'wage_per_worker_year', l: 'Wage / worker / yr', f: v => fmt(v, 'GBP') }, { k: 'balance_week', l: 'Profit /wk', f: v => `<span class="${sign(v)}">${fmt(v, 'GBP')}</span>` }]).concat(rb ? [{ k: 'balance_b', l: 'Profit /wk (B)', f: v => `<span class="${sign(v)}">${fmt(v, 'GBP')}</span>` }] : [])
+    .concat([{ k: 'margin', l: 'Margin', f: v => pct0(v, 0) }, { k: 'avg_throughput', l: 'Throughput', f: v => v == null ? '–' : '×' + v.toFixed(2) }]),
+    rows.map(r => Object.assign({ name: tlabel(r.building_type) }, r)), { sort: 'value_added_week' });
+};
+function econRows(ERx, c, s) {   // rows of one run for a country ('' = all great powers, summed per building type) and sector
+  let rows = ERx.filter(r => (!c || r.country_tag === c) && (!s || r.sector === s));
+  if (!c) {  // aggregate over GPs per building type
+    const g = {};
+    rows.forEach(r => { const a = g[r.building_type] = g[r.building_type] || { country_tag: 'GPs', building_type: r.building_type, sector: r.sector, levels: 0, employed: 0, revenue_week: null, value_added_week: null, balance_week: null, _wage: null, _empp: 0, _thr: 0, _occ: 0 };
+      a.levels += r.levels || 0; a.employed += r.employed || 0; a._thr += (r.avg_throughput || 0) * (r.levels || 0); a._occ += (r.occupancy || 0) * (r.levels || 0);
+      if (r.revenue_week != null) { a.revenue_week = (a.revenue_week || 0) + r.revenue_week; a.value_added_week = (a.value_added_week || 0) + (r.value_added_week || 0); a.balance_week = (a.balance_week || 0) + (r.balance_week || 0); a._empp += r.employed || 0; if (r.wage_per_worker_year != null) a._wage = (a._wage || 0) + r.wage_per_worker_year * (r.employed || 0) / 52; } });
+    rows = Object.values(g).map(a => Object.assign(a, { value_added_per_worker_year: a.value_added_week != null && a._empp ? a.value_added_week * 52 / a._empp : null, wage_per_worker_year: a._wage != null && a._empp ? a._wage * 52 / a._empp : null, margin: a.revenue_week ? a.balance_week / a.revenue_week : null, avg_throughput: a.levels ? a._thr / a.levels : null, occupancy: a.levels ? a._occ / a.levels : null }));
+  }
+  return rows.map(r => Object.assign({}, r));
+}
+
+// ------------------------------------------------------------------ production methods
+// Choose a building type, one of its production-method groups (A-F, game order) and up to 6 countries:
+// one small chart per country (methods of the group over time, B dashed), a 100 % bar per country (and run) for the
+// last year, and a table. Shares come from the focus countries' buildings (D.pm: country -> type -> method -> [per year]).
+const PM = D.pm, PMB = B ? B.pm : null;
+const PMG = Object.assign({}, B ? B.pm_groups : {}, D.pm_groups || {});   // type -> [[group key, label, [methods]]]
+const PML = Object.assign({}, B ? B.pm_labels : {}, D.pm_labels || {});
+const LETTERS = 'ABCDEF';
+const pmCountries = Array.from(new Set(GPS.concat(Object.keys(PM), PMB ? Object.keys(PMB) : []))).filter(t => PM[t] || (PMB && PMB[t]));
+let pcs = load('pcs', null);
+pcs = (Array.isArray(pcs) ? pcs : [pmCountries.includes('GBR') ? 'GBR' : pmCountries[0]]).filter(t => pmCountries.includes(t)).slice(0, 6);
+if (!pcs.length && pmCountries.length) pcs = [pmCountries[0]];
+const pmLv = t => pcs.reduce((s, c) => s + ((TL[c] && TL[c][t]) ? last(TL[c][t]) || 0 : 0), 0);   // levels in the chosen countries (A)
+function fillPT() {
+  const types = Array.from(new Set(pcs.flatMap(c => Object.keys(PM[c] || {}).concat(PMB ? Object.keys(PMB[c] || {}) : []))));
+  typeOptions($('pt'), types, pmLv, 'levels', load('pt', 'building_textile_mill'));
+}
+function pmGroupsOf(bt) {   // [[key, label, methods]]; without game files: one group with every method seen
+  const g = PMG[bt];
+  if (g && g.length) return g;
+  const seen = new Set(pcs.flatMap(c => Object.keys((PM[c] || {})[bt] || {}).concat(PMB ? Object.keys((PMB[c] || {})[bt] || {}) : [])));
+  return [['all', 'All methods', Array.from(seen)]];
+}
+fillPT();
+if (B) { $('prunw').style.display = ''; $('prun').value = load('prun', 'both'); }
+$('pt').onchange = () => { store('pt', $('pt').value); draws.pm(); };
+$('prun').onchange = () => { store('prun', $('prun').value); draws.pm(); };
+function stackBar(host, rows) {   // rows: [{label, light, parts: [{name, color, value}]}] -> one 100 % bar per row
+  host.innerHTML = '';
+  if (!rows.length) { host.innerHTML = '<div class="empty">No data</div>'; return; }
+  const W = Math.max(300, host.clientWidth), rh = 26, m = { l: 90, r: 12, t: 4, b: 4 }, H = m.t + m.b + rows.length * rh, iw = W - m.l - m.r;
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H }, host);
+  rows.forEach((r, i) => {
+    const yy = m.t + i * rh, tot = r.parts.reduce((a, p) => a + (p.value || 0), 0);
+    el('text', { x: m.l - 8, y: yy + 17, 'text-anchor': 'end', class: 'lbl' }, svg).textContent = r.label;
+    if (!tot) { el('text', { x: m.l + 4, y: yy + 17 }, svg).textContent = 'no buildings of this type'; return; }
+    let acc = 0;
+    r.parts.forEach(p => {
+      if (!p.value) return;
+      const w = p.value / tot * iw;
+      el('rect', { x: m.l + acc, y: yy + 4, width: Math.max(0.5, w - 1), height: 18, fill: p.color, 'fill-opacity': r.light ? 0.5 : 1 }, svg);
+      if (w > 36) el('text', { x: m.l + acc + w / 2, y: yy + 17, 'text-anchor': 'middle', style: 'fill:' + (r.light ? 'var(--ink)' : '#fff') + ';font-weight:600' }, svg).textContent = Math.round(p.value / tot * 100) + '%';
+      acc += w;
+    });
+    const hit = el('rect', { x: 0, y: yy, width: W, height: rh, fill: 'transparent' }, svg);
+    hit.addEventListener('mousemove', ev => { const cr = host.getBoundingClientRect(); showTip(host, ev.clientX - cr.left, ev.clientY - cr.top, `<div class="t">${r.label}</div>` + r.parts.filter(p => p.value).map(p => `<div class="r"><span><i style="background:${p.color}"></i>${p.name}</span><b>${pct0(p.value / tot, 0)}</b></div>`).join('')); });
+    hit.addEventListener('mouseleave', hideTip);
+  });
+}
+draws.pm = () => {
+  const bt = $('pt').value;
+  $('pcs').innerHTML = pmCountries.map(t => `<button class="chip ${pcs.includes(t) ? 'on' : ''} ${C[t] && C[t].gp ? 'gp' : ''}" data-t="${t}">${t}</button>`).join('');
+  $('pcs').querySelectorAll('.chip').forEach(b => b.onclick = () => {
+    const t = b.dataset.t;
+    if (pcs.includes(t)) { if (pcs.length > 1) pcs = pcs.filter(x => x !== t); } else { pcs.push(t); if (pcs.length > 6) pcs.shift(); }
+    store('pcs', pcs); fillPT(); draws.pm();
+  });
+  const groups = pmGroupsOf(bt).slice(0, 6);
+  if (!bt || !groups.length) { $('pm-charts').innerHTML = '<div class="empty">No production-method data for the chosen countries</div>'; $('c-pmbar').innerHTML = ''; $('t-pm').innerHTML = ''; $('pgroups').innerHTML = ''; return; }
+  const gi = Math.max(0, Math.min(load('pg', 0), groups.length - 1));
+  $('pgroups').innerHTML = groups.map((g, i) => `<button class="chip ${i === gi ? 'on' : ''}" data-i="${i}" title="${g[2].map(x => PML[x] || x).join(', ')}"><b>${LETTERS[i]}</b> ${g[1]}</button>`).join('');
+  $('pgroups').querySelectorAll('.chip').forEach(b => b.onclick = () => { store('pg', +b.dataset.i); draws.pm(); });
+  const [, glabel, methods] = groups[gi];
+  const col = Object.fromEntries(methods.map((x, i) => [x, SLOTS[i % 8]]));
+  const runs = B ? ($('prun').value === 'both' ? ['a', 'b'] : [$('prun').value]) : ['a'];
+  const two = runs.length === 2, RL = r => r === 'a' ? 'A' : 'B';
+  const val = (r, c, x) => ((((r === 'a' ? PM : PMB) || {})[c] || {})[bt] || {})[x] || null;
+  const used = methods.filter(x => pcs.some(c => runs.some(r => (val(r, c, x) || []).some(v => v > 0))));
+  $('pm-title').textContent = `${tlabel(bt)}: group ${LETTERS[gi]} · ${glabel}` + (two ? ' (A solid, B dashed)' : (B ? ' (' + (runs[0] === 'a' ? 'A: ' + LA : 'B: ' + LB) + ')' : ''));
+  // one chart per country
+  const host = $('pm-charts');
+  host.innerHTML = '';
+  host.style.gridTemplateColumns = pcs.length === 1 ? '1fr' : '';
+  pcs.forEach(c => {
+    const box = document.createElement('div');
+    const lvA = TL[c] && TL[c][bt] ? last(TL[c][bt]) : null, lvB = two || runs[0] === 'b' ? (bOf('type_levels', c, bt) ? last(bOf('type_levels', c, bt)) : null) : null;
+    box.innerHTML = `<h3>${c} <span class="bv">${runs.includes('a') ? fmt(lvA) + ' levels' + (two ? ' (A)' : '') : ''}${two ? ' · ' : ''}${lvB != null ? fmt(lvB) + ' levels (B)' : ''}</span></h3><div class="chart"></div>`;
+    host.appendChild(box);
+    const series = [];
+    used.forEach(x => runs.forEach(r => { const v = val(r, c, x); if (v) series.push({ name: (PML[x] || x) + (two ? ' · ' + RL(r) : ''), color: col[x], values: v, dash: two && r === 'b' }); }));
+    const ch = box.querySelector('.chart');
+    if (series.length) timeChart(ch, { x: D.years, series, share: true, vfmt: v => pct0(v, 0), yfmt: v => pct0(v, 0), unit: '', height: pcs.length === 1 ? 320 : 230, aria: 'Production methods in ' + c });
+    else ch.innerHTML = `<div class="empty">No ${tlabel(bt)} in ${c}</div>`;
+  });
+  $('l-pm').innerHTML = used.map(x => `<span><i style="background:${col[x]}"></i>${PML[x] || x}</span>`).join('') + (two ? `<span>${dashKey('var(--ink2)', false)}A</span><span>${dashKey('var(--ink2)', true)}B</span>` : '');
+  const unused = methods.filter(x => !used.includes(x));
+  $('pm-note').textContent = (unused.length ? 'Not used by the chosen countries: ' + unused.map(x => PML[x] || x).join(', ') + '. ' : '')
+    + (pmGroupsOf(bt).length > 6 ? 'This type has more than six groups; only A-F are offered. ' : '');
+  // across countries, last year
+  const yi = D.years.length - 1, ylast = yearOf(D.years[yi]);
+  $('pmb-title').textContent = 'Across countries, ' + ylast + ': group ' + LETTERS[gi] + ' · ' + glabel;
+  $('pmb-sub').textContent = 'Share of ' + tlabel(bt) + ' levels per method in the last year' + (two ? '; light bars = B' : '') + '. Hover a bar for the numbers.';
+  const rows = [];
+  pcs.forEach(c => runs.forEach(r => rows.push({ label: c + (two ? ' · ' + RL(r) : ''), light: two && r === 'b', parts: methods.map(x => ({ name: PML[x] || x, color: col[x], value: (val(r, c, x) || [])[yi] || 0 })) })));
+  stackBar($('c-pmbar'), rows);
+  // table: method x country (x run), last year
+  $('pmt-runs').textContent = two ? ' and run (A, B)' : '';
+  const cols = [{ k: 'name', l: 'Production method', left: true }];
+  pcs.forEach(c => runs.forEach(r => cols.push({ k: c + '_' + r, l: c + (two ? ' ' + RL(r) : ''), f: v => pct0(v, 0), bar: cols.length === 1 })));
+  $('t-pm')._sort = null;   // columns change with the countries: start sorted by the first one
+  table($('t-pm'), cols, methods.map(x => { const o = { name: PML[x] || x }; pcs.forEach(c => runs.forEach(r => { const v = val(r, c, x); o[c + '_' + r] = v ? v[yi] : null; })); return o; }), { sort: cols[1].k });
+};
+
+// ------------------------------------------------------------------ about
+$('aboutbox').innerHTML = `<h2>About the data</h2>
+<p>Generated by <code>src/v3a/analysis/run_analysis.py</code> (run <code>${M.run_id}</code>, ${M.created}) from <code>${M.source}</code>.
+All tables behind this page are in <code>analysis.sqlite</code> in the same folder; each column is described in its <code>column_docs</code> table.</p>
+<h3>Definitions</h3>
+<ul>
+<li><b>GDP, population, treasury, tax income</b>: as read from each save (see <code>column_docs</code> of the source database for confidence).</li>
+<li><b>Value added</b> = revenue − input cost (GBP per week). <b>Wages</b> are derived as value added − weekly balance. <b>Per worker per year</b> = weekly value × 52 ÷ workers in buildings with revenue.</li>
+<li><b>Margin</b> = weekly balance ÷ revenue. Government buildings have no revenue, so their economics are blank.</li>
+<li><b>Buildings</b> count where they stand (owner of the state), not by who owns the shares.</li>
+<li><b>Focus countries</b> (${(M.focus_countries || M.great_powers).join(', ')}): great and major powers of the series (or the one country of a country-mode series). Individual-building data (economics, production methods) exist only for them; world totals cover every country. Great powers are marked GP.</li>
+<li><b>Sectors</b> are this tool's grouping of the game's building groups (<code>game/common/building_groups</code>); company buildings are matched by name. Monuments count as government.</li>
+<li><b>Building lists</b>: Development (one group: the game's development category plus ownership buildings); Agriculture: Subsistence, Plantations, Traditional agriculture (staple crops, ranches, vineyards); Extraction: Mining (mines, gold fields), Other extraction (logging, fishing, whaling, oil, rubber); Urban: Light, Heavy and Military Industries, Services &amp; arts. Most levels first (world, or the chosen country). Names are the game's English names.</li>
+<li><b>Production-method groups</b> A–F are the building's <code>production_method_groups</code> in the game's order (<code>game/common/buildings</code>, <code>production_method_groups</code>). Methods seen in a save but in no group are listed as "Other methods".</li>
+<li>Countries in this report: focus countries + top countries by GDP in the first and last save (${Object.keys(D.countries).length} in total). Not recorded: monuments, canals, company headquarters, special and unbuilt buildings.</li>
+</ul>` + (CMP ? `<h3>Run comparison</h3>
+<ul>
+<li><b>A</b> = ${LA}: <code>${CMP.runs[0].source_db}</code>${CMP.runs[0].modded ? ' (modded: ' + CMP.runs[0].modded_note + ')' : ''}</li>
+<li><b>B</b> = ${LB}: <code>${CMP.runs[1].source_db}</code>${CMP.runs[1].modded ? ' (modded: ' + CMP.runs[1].modded_note + ')' : ''}</li>
+<li>Both series are cut to the save dates they share (${M.first_date} → ${M.last_date}, ${M.saves} saves), so "last save" means the same in-game date in A and B. Each run is analysed on its own, the same way as <code>run_analysis.py</code>.</li>
+<li>In <b>A vs B</b>, B is drawn as dashed lines (same colour as A) or light bars, and tables get B columns. Sector charts become lines (one per sector and run) instead of stacked areas.</li>
+<li>Building-level data (economics, production methods, building types per country) exist only for each run's own focus countries (great and major powers of that run), so a country can be missing in one run. "All great powers" sums each run's own focus countries.</li>
+<li>The two games started from the same date but play out differently; differences are one run each, not an average.</li>
+<li>Comparison tables: <code>data/comparison.sqlite</code> (compare_runs, compare_world, compare_countries, compare_types).</li>
+</ul>` : '');
+
+setTab(tab);
+</script>
+</body>
+</html>
