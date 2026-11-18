@@ -15,7 +15,7 @@ Output: outputs/analysis/economy_report/<date>_<n>/
 outputs/analysis/latest_report.html always opens the newest report.
 The source database is opened read-only. Analysis functions live in economy.py (reusable).
 """
-import argparse, datetime, json, os, sys, webbrowser
+import argparse, datetime, json, os, re, sys, webbrowser
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))   # src/ -> import v3a.*
 
 from v3a.analysis import economy as A
@@ -241,8 +241,20 @@ def report_data(con, run_id, src, res, n_countries, extra_tags=()):
     }
 
 
+def _hide_paths(obj):
+    """Copy of the report data where absolute file paths keep only their last 3 parts (no user/folder names in a shared report)."""
+    if isinstance(obj, dict):
+        return {k: _hide_paths(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_hide_paths(v) for v in obj]
+    if isinstance(obj, str) and re.match(r'^([A-Za-z]:[\\/]|/|\\\\)', obj):
+        return '.../' + '/'.join(re.split(r'[\\/]+', obj.rstrip('/\\'))[-3:])
+    return obj
+
+
 def write_html(path, data):
-    """Fill report_template.html with the report data -> self-contained report.html."""
+    """Fill report_template.html with the report data -> self-contained report.html (absolute paths shortened)."""
+    data = _hide_paths(data)
     with open(TEMPLATE, encoding='utf-8') as f:
         html = f.read()
     blob = json.dumps(data, separators=(',', ':')).replace('</', '<\\/')
