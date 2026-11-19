@@ -114,4 +114,4 @@ read from a debug-mode text save of version 1.15.1. Most values (GDP, population
 sales) are direct copies of what the game saved; a few report columns are derived (for example value added and
 wages). Saves from other game versions may number fields differently.
 
-This is a fan-made tool, not affiliated with Paradox Interactive.
+Released under the [MIT License](LICENSE). This is a fan-made tool, not affiliated with Paradox Interactive.
